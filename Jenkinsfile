@@ -7,16 +7,39 @@ pipeline {
     }
 
     stages {
-        stage('Preparation') {
+        stage('Checkout') {
             steps {
-                echo 'Starting Django CI Pipeline'
-                echo "Job: ${env.JOB_NAME}"
-                echo "Build number: ${env.BUILD_NUMBER}"
+                echo 'Checking out Django source code from GitHub'
+
+                checkout scm
+
+                echo 'Verifying checked-out repository files'
+
+                sh '''
+                    set -e
+
+                    echo "Current workspace:"
+                    pwd
+
+                    echo "Repository files:"
+                    ls -la
+
+                    echo "Checking required Django files"
+
+                    test -f manage.py
+                    test -f requirements.txt
+                    test -f core/tests.py
+                    test -f config/settings.py
+
+                    echo "All required Django files are present"
+                '''
             }
         }
 
         stage('Verify Execution Environment') {
             steps {
+                echo 'Checking Jenkins execution environment'
+
                 sh '''
                     set -e
 
@@ -26,8 +49,11 @@ pipeline {
                     echo "Operating system:"
                     uname -s
 
-                    echo "Current directory:"
-                    pwd
+                    echo "Jenkins job:"
+                    echo "$JOB_NAME"
+
+                    echo "Build number:"
+                    echo "$BUILD_NUMBER"
                 '''
             }
         }
