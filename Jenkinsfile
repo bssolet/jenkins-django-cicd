@@ -1,59 +1,94 @@
 
 pipeline {
-    agent any
+    agent {
+        label 'python'
+    }
 
     options {
         skipDefaultCheckout(true)
+        timestamps()
+        disableConcurrentBuilds()
     }
 
     stages {
         stage('Checkout') {
             steps {
-                echo 'Checking out Django source code from GitHub'
+                echo 'Checking out Django source code'
 
                 checkout scm
 
-                echo 'Verifying checked-out repository files'
-
                 sh '''
-                    set -e
-
-                    echo "Current workspace:"
-                    pwd
-
-                    echo "Repository files:"
-                    ls -la
-
-                    echo "Checking required Django files"
+                    set -eu
 
                     test -f manage.py
                     test -f requirements.txt
                     test -f core/tests.py
                     test -f config/settings.py
 
-                    echo "All required Django files are present"
+                    echo "Django source files verified"
+                    git rev-parse --short HEAD
                 '''
             }
         }
 
-        stage('Verify Execution Environment') {
+        stage('Verify Python') {
             steps {
-                echo 'Checking Jenkins execution environment'
-
                 sh '''
-                    set -e
+                    set -eu
 
-                    echo "Current user:"
+                    echo "Execution user:"
                     whoami
 
-                    echo "Operating system:"
-                    uname -s
+                    echo "Python version:"
+                    python --version
 
-                    echo "Jenkins job:"
-                    echo "$JOB_NAME"
+                    echo "Workspace:"
+                    pwd
+                '''
+            }
+        }
 
-                    echo "Build number:"
-                    echo "$BUILD_NUMBER"
+        stage('Create Virtual Environment') {
+            steps {
+                sh '''
+                    set -eu
+
+                    python -m venv .venv
+
+                    .venv/bin/python --version
+                    .venv/bin/python -m pip --version
+                '''
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh '''
+                    set -eu
+
+                    .venv/bin/python -m pip install -r requirements.txt
+
+                    .venv/bin/python -m pip check
+                '''
+            }
+        }
+
+        stage('Django System Checks') {
+            steps {
+                sh '''
+                    set -eu
+
+                    .venv/bin/python manage.py check
+                '''
+            }
+        }
+
+        stage('Django Automated Tests') {
+            steps {
+                sh '''
+                    set -eu
+
+                    .venv/bin/python manage.py test -v 2
                 '''
             }
         }
@@ -61,15 +96,15 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline execution finished'
+            echo 'Django CI pipeline execution finished'
         }
 
         success {
-            echo 'Pipeline completed successfully'
+            echo 'Django CI pipeline completed successfully'
         }
 
         failure {
-            echo 'Pipeline failed'
+            echo 'Django CI pipeline failed'
         }
     }
 }
